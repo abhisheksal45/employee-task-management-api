@@ -35,3 +35,7 @@ build/
 # secrets
 .env
 application-local.properties
+
+.env
+.env.*
+!.env.example

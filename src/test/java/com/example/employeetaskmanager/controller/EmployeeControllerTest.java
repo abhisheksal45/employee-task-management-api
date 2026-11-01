@@ -7,11 +7,16 @@ import com.example.employeetaskmanager.Exception.DuplicateResourceException;
 import com.example.employeetaskmanager.Exception.ResourceNotFoundException;
 import com.example.employeetaskmanager.Service.EmployeeService;
 import com.example.employeetaskmanager.Service.TaskService;
+import com.example.employeetaskmanager.config.SecurityConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -28,10 +33,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 @WebMvcTest(EmployeeController.class)
-class EmployeeControllerTest {
+@Import(SecurityConfig.class)
+@WithMockUser(roles = "ADMIN")
 
+class EmployeeControllerTest {
+    @MockitoBean
+    private JwtDecoder jwtDecoder;    // SecurityConfig ko chahiye, asli decoder test mein nahi
     @Autowired
     private MockMvc mockMvc;
 
@@ -181,5 +189,51 @@ class EmployeeControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(employeeService).deleteEmployee(1L);
+    }
+    @Test
+    @WithAnonymousUser
+    @DisplayName("no login -> 401 in our JSON format")
+    void anonymous_returns401() throws Exception {
+        mockMvc.perform(get("/api/employees/1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message")
+                        .value(containsString("Authentication is required")));
+
+        verifyNoInteractions(employeeService);
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("USER can read")
+    void user_canRead() throws Exception {
+        when(employeeService.getEmployeeById(1L))
+                .thenReturn(new EmployeeResponse(1L, "Rahul", 1L, "IT"));
+
+        mockMvc.perform(get("/api/employees/1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("USER cannot create -> 403")
+    void user_cannotCreate_returns403() throws Exception {
+        mockMvc.perform(post("/api/employees")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Rahul\",\"departmentId\":1}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+
+        verifyNoInteractions(employeeService);
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("USER cannot delete -> 403")
+    void user_cannotDelete_returns403() throws Exception {
+        mockMvc.perform(delete("/api/employees/1"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(employeeService);
     }
 }

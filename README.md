@@ -105,5 +105,20 @@ Error format:
 - Integration tests with Testcontainers
 
 ## Author
+### Run with Docker (recommended)
+
+1. Copy `.env.example` to `.env` and set `DB_PASSWORD` and `JWT_SECRET`.
+2. Start everything:
+   ```
+   docker compose up --build
+   ```
+3. Open http://localhost:8080/swagger-ui.html
+
+To create an admin: register a user, then
+```
+docker exec -it employee-db psql -U postgres -d employee_db -c "UPDATE users SET role='ADMIN' WHERE username='your_username';"
+```
+
+Stop: `docker compose down` (add `-v` to also delete the database).
 
 Your Name · Abhishek

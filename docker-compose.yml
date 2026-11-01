@@ -1,0 +1,39 @@
+
+services:
+  db:
+    image: postgres:18
+    container_name: employee-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: employee_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d employee_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # pgAdmin se dekhna ho to niche ki 2 lines khol do (5433 isliye ki 5432 par tumhara local Postgres hai)
+    # ports:
+    #   - "5433:5432"
+
+  app:
+    build: .
+    container_name: employee-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_URL: jdbc:postgresql://db:5432/employee_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
